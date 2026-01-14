@@ -1,4 +1,4 @@
-# Letta Subconscious
+# Claude Subconscious
 
 A subconscious for Claude Code.
 
@@ -6,7 +6,7 @@ A [Letta](https://letta.com) agent watches your sessions, accumulates context, a
 
 ## What Is This?
 
-Claude Code is fast and reactive but stateless - it forgets everything between sessions. Letta Subconscious adds a persistent layer underneath:
+Claude Code is fast and reactive but stateless - it forgets everything between sessions. Claude Subconscious adds a persistent layer underneath:
 
 - **Your Letta agent observes** every Claude Code conversation
 - **Accumulates patterns** across sessions, projects, and time
