@@ -33,10 +33,10 @@ Claude Code is fast and reactive but stateless - it forgets everything between s
 
 ```bash
 # Add the plugin
-/plugin marketplace add letta-ai/letta-subconscious-plugin
+/plugin marketplace add letta-ai/claude-subconscious
 
 # Install
-/plugin install claude-subconscious@letta-ai/letta-subconscious-plugin
+/plugin install claude-subconscious@letta-ai/claude-subconscious
 ```
 
 ## Configuration

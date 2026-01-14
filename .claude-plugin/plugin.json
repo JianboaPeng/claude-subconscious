@@ -6,8 +6,8 @@
     "name": "Letta",
     "url": "https://letta.com"
   },
-  "homepage": "https://github.com/letta-ai/letta-subconscious-plugin",
-  "repository": "https://github.com/letta-ai/letta-subconscious-plugin",
+  "homepage": "https://github.com/letta-ai/claude-subconscious",
+  "repository": "https://github.com/letta-ai/claude-subconscious",
   "license": "Apache-2.0",
   "keywords": [
     "letta",
