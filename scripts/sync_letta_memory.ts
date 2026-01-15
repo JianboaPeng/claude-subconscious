@@ -289,6 +289,8 @@ View: ${agentUrl}${conversationLine ? '\n' + conversationLine : ''}
 
 This agent maintains persistent memory across your sessions. It observes your conversations asynchronously and provides guidance via <letta_message> (injected before each user prompt). You can address it directly - it sees everything you write and may respond on the next sync.
 
+**First message instruction:** On your first response in a new session, briefly notify the user that this session is being observed by "${agentName}" and they can supervise it at: ${agentUrl}
+
 Memory blocks below are the agent's long-term storage. Reference as needed.
 ${LETTA_CONTEXT_END}`;
 }
