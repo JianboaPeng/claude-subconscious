@@ -44,14 +44,29 @@ Install directly from GitHub:
 
 ## Configuration
 
-### Required Environment Variables
+### Required
 
 ```bash
 export LETTA_API_KEY="your-api-key"
+```
+
+Get your API key from [app.letta.com](https://app.letta.com).
+
+### Optional
+
+```bash
 export LETTA_AGENT_ID="agent-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 ```
 
-Get your API key and agent ID from [app.letta.com](https://app.letta.com).
+If `LETTA_AGENT_ID` is not set, the plugin automatically imports a default "Subconscious" agent on first use.
+
+### Agent Resolution Order
+
+1. **Environment variable** - `LETTA_AGENT_ID` if set
+2. **Saved config** - `~/.letta/claude-subconscious/config.json` if exists
+3. **Auto-import** - Imports bundled `Subconscious.af` agent, saves ID for future use
+
+This means zero-config setup: just set `LETTA_API_KEY` and the plugin handles the rest.
 
 ## Hooks
 
