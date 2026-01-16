@@ -99,8 +99,14 @@ interface SyncState {
   conversationId?: string;
 }
 
+interface ConversationEntry {
+  conversationId: string;
+  agentId: string;
+}
+
+// Support both old format (string) and new format (object) for backward compatibility
 interface ConversationsMap {
-  [sessionId: string]: string; // sessionId -> conversationId
+  [sessionId: string]: string | ConversationEntry;
 }
 
 interface Conversation {
@@ -274,13 +280,14 @@ async function createConversation(apiKey: string, agentId: string): Promise<stri
  * Get or create conversation for a session
  */
 async function getOrCreateConversation(
-  apiKey: string, 
-  agentId: string, 
+  apiKey: string,
+  agentId: string,
   sessionId: string,
   cwd: string,
   state: SyncState
 ): Promise<string> {
   // Check if we already have a conversation ID in state
+  // Note: state.conversationId should already be validated by SessionStart hook
   if (state.conversationId) {
     log(`Using existing conversation from state: ${state.conversationId}`);
     return state.conversationId;
@@ -288,20 +295,48 @@ async function getOrCreateConversation(
 
   // Check the conversations map
   const conversationsMap = loadConversationsMap(cwd);
-  if (conversationsMap[sessionId]) {
-    log(`Found conversation in map: ${conversationsMap[sessionId]}`);
-    state.conversationId = conversationsMap[sessionId];
-    return conversationsMap[sessionId];
+  const cached = conversationsMap[sessionId];
+
+  if (cached) {
+    // Parse both old format (string) and new format (object)
+    const entry = typeof cached === 'string'
+      ? { conversationId: cached, agentId: null as string | null }
+      : cached;
+
+    if (entry.agentId && entry.agentId !== agentId) {
+      // Agent ID changed - clear stale entry and create new conversation
+      log(`Agent ID changed (${entry.agentId} -> ${agentId}), clearing stale conversation`);
+      delete conversationsMap[sessionId];
+      const conversationId = await createConversation(apiKey, agentId);
+      conversationsMap[sessionId] = { conversationId, agentId };
+      saveConversationsMap(cwd, conversationsMap);
+      state.conversationId = conversationId;
+      return conversationId;
+    } else if (!entry.agentId) {
+      // Old format without agentId - upgrade by recreating
+      log(`Upgrading old format entry (no agentId stored), creating new conversation`);
+      delete conversationsMap[sessionId];
+      const conversationId = await createConversation(apiKey, agentId);
+      conversationsMap[sessionId] = { conversationId, agentId };
+      saveConversationsMap(cwd, conversationsMap);
+      state.conversationId = conversationId;
+      return conversationId;
+    } else {
+      // Valid entry with matching agentId - reuse
+      log(`Found conversation in map: ${entry.conversationId}`);
+      state.conversationId = entry.conversationId;
+      return entry.conversationId;
+    }
   }
 
-  // Create a new conversation
+  // No existing entry - create a new conversation
   const conversationId = await createConversation(apiKey, agentId);
-  
+
   // Save to map and state
-  conversationsMap[sessionId] = conversationId;
+  conversationsMap[sessionId] = { conversationId, agentId };
   saveConversationsMap(cwd, conversationsMap);
   state.conversationId = conversationId;
-  
+
   return conversationId;
 }
 
@@ -578,31 +613,34 @@ async function sendBatchToConversation(
     return { skipped: false };
   }
 
-  // Format as a conversation summary
-  const conversationSummary = messages.map(m => {
-    const roleLabel = m.role === 'user' ? 'User' : m.role === 'assistant' ? 'Claude Code' : 'System';
-    return `[${roleLabel}]: ${m.text}`;
-  }).join('\n\n---\n\n');
+  // Format as XML-structured transcript
+  const transcriptEntries = messages.map(m => {
+    const role = m.role === 'user' ? 'user' : m.role === 'assistant' ? 'claude_code' : 'system';
+    // Escape XML special chars in text
+    const escaped = m.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return `<message role="${role}">\n${escaped}\n</message>`;
+  }).join('\n');
 
-  const systemMessage = `[Claude Code Session Update]
-Session ID: ${sessionId}
+  const userMessage = `<claude_code_session_update>
+<session_id>${sessionId}</session_id>
 
-The following conversation occurred in Claude Code:
+<transcript>
+${transcriptEntries}
+</transcript>
 
-${conversationSummary}
-
----
-
-You may provide commentary or guidance for Claude Code. Your response will be added to Claude's context window (in the <letta_message> section of CLAUDE.md) on the next prompt. Use this to:
+<instructions>
+You may provide commentary or guidance for Claude Code. Your response will be added to Claude's context window on the next prompt. Use this to:
 - Offer observations about the user's work
 - Provide reminders or context from your memory
 - Suggest approaches or flag potential issues
 - Send async messages/guidance to Claude Code
 
-Write your response as if speaking directly to Claude Code.`;
+Write your response as if speaking directly to Claude Code.
+</instructions>
+</claude_code_session_update>`;
 
   log(`Sending batch of ${messages.length} messages to conversation ${conversationId}`);
-  return await sendMessageToConversation(apiKey, conversationId, 'system', systemMessage);
+  return await sendMessageToConversation(apiKey, conversationId, 'user', userMessage);
 }
 
 /**
@@ -679,27 +717,29 @@ async function main(): Promise<void> {
     saveSyncState(hookInput.cwd, state);
 
     // Build the message payload (same format as sendBatchToConversation)
-    const conversationSummary = newMessages.map(m => {
-      const roleLabel = m.role === 'user' ? 'User' : m.role === 'assistant' ? 'Claude Code' : 'System';
-      return `[${roleLabel}]: ${m.text}`;
-    }).join('\n\n---\n\n');
+    const transcriptEntries = newMessages.map(m => {
+      const role = m.role === 'user' ? 'user' : m.role === 'assistant' ? 'claude_code' : 'system';
+      const escaped = m.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return `<message role="${role}">\n${escaped}\n</message>`;
+    }).join('\n');
 
-    const systemMessage = `[Claude Code Session Update]
-Session ID: ${hookInput.session_id}
+    const userMessage = `<claude_code_session_update>
+<session_id>${hookInput.session_id}</session_id>
 
-The following conversation occurred in Claude Code:
+<transcript>
+${transcriptEntries}
+</transcript>
 
-${conversationSummary}
-
----
-
-You may provide commentary or guidance for Claude Code. Your response will be added to Claude's context window (in the <letta_message> section of CLAUDE.md) on the next prompt. Use this to:
+<instructions>
+You may provide commentary or guidance for Claude Code. Your response will be added to Claude's context window on the next prompt. Use this to:
 - Offer observations about the user's work
 - Provide reminders or context from your memory
 - Suggest approaches or flag potential issues
 - Send async messages/guidance to Claude Code
 
-Write your response as if speaking directly to Claude Code.`;
+Write your response as if speaking directly to Claude Code.
+</instructions>
+</claude_code_session_update>`;
 
     // Write payload to temp file for the worker
     const payloadFile = path.join(TEMP_STATE_DIR, `payload-${hookInput.session_id}-${Date.now()}.json`);
@@ -707,7 +747,7 @@ Write your response as if speaking directly to Claude Code.`;
       apiKey,
       conversationId,
       sessionId: hookInput.session_id,
-      message: systemMessage,
+      message: userMessage,
       stateFile: getSyncStateFile(hookInput.cwd, hookInput.session_id),
       newLastProcessedIndex: messages.length - 1,
     };

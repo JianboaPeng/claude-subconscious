@@ -42,7 +42,7 @@ async function sendToLetta(payload: Payload): Promise<boolean> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      messages: [{ role: 'system', content: payload.message }],
+      messages: [{ role: 'user', content: payload.message }],
     }),
   });
 

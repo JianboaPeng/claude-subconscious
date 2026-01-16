@@ -35,8 +35,14 @@ interface HookInput {
   hook_event_name?: string;
 }
 
+interface ConversationEntry {
+  conversationId: string;
+  agentId: string;
+}
+
+// Support both old format (string) and new format (object) for backward compatibility
 interface ConversationsMap {
-  [sessionId: string]: string;
+  [sessionId: string]: string | ConversationEntry;
 }
 
 interface Conversation {
@@ -185,13 +191,17 @@ async function sendSessionStartMessage(
   const projectName = path.basename(cwd);
   const timestamp = new Date().toISOString();
 
-  const message = `[Session Start]
-Project: ${projectName}
-Path: ${cwd}
-Session: ${sessionId}
-Started: ${timestamp}
+  const message = `<claude_code_session_start>
+<project>${projectName}</project>
+<path>${cwd}</path>
+<session_id>${sessionId}</session_id>
+<timestamp>${timestamp}</timestamp>
 
-A new Claude Code session has begun. I'll be sending you updates as the session progresses.`;
+<context>
+A new Claude Code session has begun. I'll be sending you updates as the session progresses.
+You may update your memory blocks with any relevant context for this project.
+</context>
+</claude_code_session_start>`;
 
   log(`Sending session start message to conversation ${conversationId}`);
 
@@ -202,7 +212,7 @@ A new Claude Code session has begun. I'll be sending you updates as the session 
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      messages: [{ role: 'system', content: message }],
+      messages: [{ role: 'user', content: message }],
     }),
   });
 
@@ -250,14 +260,37 @@ async function main(): Promise<void> {
     const conversationsMap = loadConversationsMap(hookInput.cwd);
 
     let conversationId: string;
-    if (conversationsMap[hookInput.session_id]) {
-      // Reuse existing conversation
-      conversationId = conversationsMap[hookInput.session_id];
-      log(`Reusing existing conversation: ${conversationId}`);
+    const cached = conversationsMap[hookInput.session_id];
+
+    if (cached) {
+      // Parse both old format (string) and new format (object)
+      const entry = typeof cached === 'string'
+        ? { conversationId: cached, agentId: null as string | null }
+        : cached;
+
+      if (entry.agentId && entry.agentId !== agentId) {
+        // Agent ID changed - clear stale entry and create new conversation
+        log(`Agent ID changed (${entry.agentId} -> ${agentId}), clearing stale conversation`);
+        delete conversationsMap[hookInput.session_id];
+        conversationId = await createConversation(apiKey, agentId);
+        conversationsMap[hookInput.session_id] = { conversationId, agentId };
+        saveConversationsMap(hookInput.cwd, conversationsMap);
+      } else if (!entry.agentId) {
+        // Old format without agentId - upgrade by recreating
+        log(`Upgrading old format entry (no agentId stored), creating new conversation`);
+        delete conversationsMap[hookInput.session_id];
+        conversationId = await createConversation(apiKey, agentId);
+        conversationsMap[hookInput.session_id] = { conversationId, agentId };
+        saveConversationsMap(hookInput.cwd, conversationsMap);
+      } else {
+        // Valid entry with matching agentId - reuse
+        conversationId = entry.conversationId;
+        log(`Reusing existing conversation: ${conversationId}`);
+      }
     } else {
-      // Create new conversation
+      // No existing entry - create new conversation
       conversationId = await createConversation(apiKey, agentId);
-      conversationsMap[hookInput.session_id] = conversationId;
+      conversationsMap[hookInput.session_id] = { conversationId, agentId };
       saveConversationsMap(hookInput.cwd, conversationsMap);
     }
 
