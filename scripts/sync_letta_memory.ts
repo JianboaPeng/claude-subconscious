@@ -320,7 +320,7 @@ function formatContextSection(agent: Agent, conversationId: string | null): stri
   const agentName = agent.name || 'Unnamed Agent';
   const agentDesc = agent.description || 'No description provided';
   const conversationLine = conversationId 
-    ? `Conversation: ${LETTA_APP_BASE}/conversations/${conversationId}`
+    ? `Conversation: ${LETTA_APP_BASE}/agents/${agent.id}?conversation=${conversationId}`
     : '';
   
   return `${LETTA_CONTEXT_START}
