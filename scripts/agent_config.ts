@@ -49,6 +49,43 @@ function saveConfig(config: Config): void {
 }
 
 /**
+ * Get original agent name from .af file
+ */
+function getAgentNameFromFile(): string {
+  try {
+    const content = JSON.parse(fs.readFileSync(DEFAULT_AGENT_FILE, 'utf-8'));
+    // .af files have agents array with name property
+    if (content.agents && content.agents.length > 0 && content.agents[0].name) {
+      return content.agents[0].name;
+    }
+  } catch {
+    // Fall back to filename
+  }
+  return path.basename(DEFAULT_AGENT_FILE, '.af');
+}
+
+/**
+ * Rename an agent
+ */
+async function renameAgent(apiKey: string, agentId: string, name: string): Promise<void> {
+  const url = `${LETTA_API_BASE}/agents/${agentId}`;
+  
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ name }),
+  });
+
+  if (!response.ok) {
+    // Non-fatal - agent still works with _copy name
+    console.error(`Warning: Could not rename agent: ${response.status}`);
+  }
+}
+
+/**
  * Import agent from .af file
  */
 async function importDefaultAgent(apiKey: string): Promise<string> {
@@ -56,6 +93,9 @@ async function importDefaultAgent(apiKey: string): Promise<string> {
   
   // Read the agent file
   const agentFileContent = fs.readFileSync(DEFAULT_AGENT_FILE);
+  
+  // Get original name for later rename
+  const originalName = getAgentNameFromFile();
   
   // Create form data with the file
   const formData = new FormData();
@@ -81,7 +121,12 @@ async function importDefaultAgent(apiKey: string): Promise<string> {
     throw new Error('Import succeeded but no agent ID returned');
   }
   
-  return result.agent_ids[0];
+  const agentId = result.agent_ids[0];
+  
+  // Rename to original name (removes "_copy" suffix added by import)
+  await renameAgent(apiKey, agentId, originalName);
+  
+  return agentId;
 }
 
 /**
