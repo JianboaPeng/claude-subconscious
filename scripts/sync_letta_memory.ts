@@ -275,11 +275,16 @@ async function fetchAgent(apiKey: string, agentId: string): Promise<Agent> {
 }
 
 /**
- * Fetch the last assistant message from the agent's conversation history
+ * Fetch the last assistant message from the conversation history
  */
-async function fetchLastAssistantMessage(apiKey: string, agentId: string): Promise<LastMessageInfo | null> {
-  const url = `${LETTA_API_BASE}/agents/${agentId}/messages?limit=10`;
-  
+async function fetchLastAssistantMessage(apiKey: string, conversationId: string | null): Promise<LastMessageInfo | null> {
+  if (!conversationId) {
+    // No conversation yet, return null
+    return null;
+  }
+
+  const url = `${LETTA_API_BASE}/conversations/${conversationId}/messages?limit=10`;
+
   const response = await fetch(url, {
     method: 'GET',
     headers: {
@@ -506,7 +511,7 @@ async function main(): Promise<void> {
     // Fetch agent data and last message in parallel
     const [agent, lastMessage] = await Promise.all([
       fetchAgent(apiKey, agentId),
-      fetchLastAssistantMessage(apiKey, agentId),
+      fetchLastAssistantMessage(apiKey, conversationId),
     ]);
     
     // Detect which blocks have changed since last sync
