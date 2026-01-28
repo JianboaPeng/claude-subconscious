@@ -5,6 +5,11 @@
  * 1. LETTA_AGENT_ID environment variable
  * 2. Saved config file (~/.letta/claude-subconscious/config.json)
  * 3. Auto-import from bundled Subconscious.af
+ * 
+ * Model configuration:
+ * - LETTA_MODEL environment variable overrides the default model
+ * - Format: "provider/model" (e.g., "openai/gpt-4o-mini", "anthropic/claude-3-5-sonnet")
+ * - If set, patches the agent's LLM config after import
  */
 
 import * as fs from 'fs';
@@ -23,6 +28,7 @@ const DEFAULT_AGENT_FILE = path.join(__dirname, '..', 'Subconscious.af');
 interface Config {
   agentId?: string;
   importedAt?: string;
+  model?: string; // Track which model was configured
 }
 
 /**
@@ -87,6 +93,41 @@ async function renameAgent(apiKey: string, agentId: string, name: string): Promi
 }
 
 /**
+ * Update agent's model configuration
+ * 
+ * @param apiKey - Letta API key
+ * @param agentId - Agent ID to update
+ * @param modelHandle - Model handle (e.g., "openai/gpt-4o-mini", "anthropic/claude-3-5-sonnet")
+ * @param log - Logging function
+ */
+async function updateAgentModel(
+  apiKey: string,
+  agentId: string,
+  modelHandle: string,
+  log: (msg: string) => void = console.log
+): Promise<void> {
+  const url = `${LETTA_API_BASE}/agents/${agentId}`;
+  
+  log(`Updating agent model to: ${modelHandle}`);
+  
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ model: modelHandle }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to update agent model: ${response.status} ${errorText}`);
+  }
+  
+  log(`Agent model updated to: ${modelHandle}`);
+}
+
+/**
  * Import agent from .af file
  */
 async function importDefaultAgent(apiKey: string): Promise<string> {
@@ -133,13 +174,26 @@ async function importDefaultAgent(apiKey: string): Promise<string> {
 /**
  * Get or create agent ID
  * 
- * Returns the agent ID from env var, saved config, or imports the default agent
+ * Returns the agent ID from env var, saved config, or imports the default agent.
+ * If LETTA_MODEL is set, updates the agent's model configuration.
  */
 export async function getAgentId(apiKey: string, log: (msg: string) => void = console.log): Promise<string> {
+  const desiredModel = process.env.LETTA_MODEL;
+  
   // 1. Check environment variable
   const envAgentId = process.env.LETTA_AGENT_ID;
   if (envAgentId) {
     log(`Using agent ID from LETTA_AGENT_ID: ${envAgentId}`);
+    
+    // If model override specified, update the agent
+    if (desiredModel) {
+      try {
+        await updateAgentModel(apiKey, envAgentId, desiredModel, log);
+      } catch (error) {
+        log(`Warning: Could not update model for agent ${envAgentId}: ${error}`);
+      }
+    }
+    
     return envAgentId;
   }
   
@@ -147,6 +201,21 @@ export async function getAgentId(apiKey: string, log: (msg: string) => void = co
   const config = readConfig();
   if (config.agentId) {
     log(`Using saved agent ID: ${config.agentId}`);
+    
+    // Check if model needs updating
+    if (desiredModel && config.model !== desiredModel) {
+      try {
+        await updateAgentModel(apiKey, config.agentId, desiredModel, log);
+        // Update saved config with new model
+        saveConfig({
+          ...config,
+          model: desiredModel,
+        });
+      } catch (error) {
+        log(`Warning: Could not update model for agent ${config.agentId}: ${error}`);
+      }
+    }
+    
     return config.agentId;
   }
   
@@ -160,10 +229,20 @@ export async function getAgentId(apiKey: string, log: (msg: string) => void = co
   const agentId = await importDefaultAgent(apiKey);
   log(`Imported agent: ${agentId}`);
   
+  // If model override specified, update the agent
+  if (desiredModel) {
+    try {
+      await updateAgentModel(apiKey, agentId, desiredModel, log);
+    } catch (error) {
+      log(`Warning: Could not update model for imported agent: ${error}`);
+    }
+  }
+  
   // Save for future use
   saveConfig({
     agentId,
     importedAt: new Date().toISOString(),
+    model: desiredModel,
   });
   log(`Saved agent ID to ${CONFIG_FILE}`);
   

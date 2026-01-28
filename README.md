@@ -97,10 +97,12 @@ Get your API key from [app.letta.com](https://app.letta.com).
 ```bash
 export LETTA_AGENT_ID="agent-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 export LETTA_BASE_URL="http://localhost:8283"  # For self-hosted Letta
+export LETTA_MODEL="openai/gpt-4o-mini"        # Model override
 ```
 
 - `LETTA_AGENT_ID` - If not set, the plugin automatically imports a default "Subconscious" agent on first use.
 - `LETTA_BASE_URL` - For self-hosted Letta servers. Defaults to `https://api.letta.com`.
+- `LETTA_MODEL` - Override the agent's model. Required for self-hosted Letta unless you manually configure the agent's model in the Letta UI. See [Model Configuration](#model-configuration) below.
 
 ### Agent Resolution Order
 
@@ -109,6 +111,35 @@ export LETTA_BASE_URL="http://localhost:8283"  # For self-hosted Letta
 3. **Auto-import** - Imports bundled `Subconscious.af` agent, saves ID for future use
 
 This means zero-config setup: just set `LETTA_API_KEY` and the plugin handles the rest.
+
+### Model Configuration
+
+The bundled Subconscious agent uses z.ai's free GLM-4.7 model by default, which works automatically with the Letta Cloud API. For **self-hosted Letta** or to use a different model, set `LETTA_MODEL`:
+
+```bash
+# For OpenAI
+export LETTA_MODEL="openai/gpt-4o-mini"
+
+# For Anthropic
+export LETTA_MODEL="anthropic/claude-3-5-sonnet"
+
+# For other providers
+export LETTA_MODEL="provider/model-name"
+```
+
+The model handle format is `provider/model`. Common options:
+
+| Provider | Example Models |
+|----------|----------------|
+| `openai` | `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo` |
+| `anthropic` | `claude-3-5-sonnet`, `claude-3-opus`, `claude-3-haiku` |
+| `zai` | `glm-4.7` (default) |
+
+When `LETTA_MODEL` is set:
+- **New agents**: Model is applied after auto-import
+- **Existing agents**: Model is updated on next session start if different from saved config
+
+**Note:** Ensure your Letta server has the appropriate API key configured for your chosen provider (e.g., `OPENAI_API_KEY` for OpenAI models).
 
 ## Default Subconscious Agent
 
