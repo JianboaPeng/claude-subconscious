@@ -102,7 +102,7 @@ export LETTA_MODEL="openai/gpt-4o-mini"        # Model override
 
 - `LETTA_AGENT_ID` - If not set, the plugin automatically imports a default "Subconscious" agent on first use.
 - `LETTA_BASE_URL` - For self-hosted Letta servers. Defaults to `https://api.letta.com`.
-- `LETTA_MODEL` - Override the agent's model. Required for self-hosted Letta unless you manually configure the agent's model in the Letta UI. See [Model Configuration](#model-configuration) below.
+- `LETTA_MODEL` - Override the agent's model. Optional - the plugin auto-detects and selects from available models. See [Model Configuration](#model-configuration) below.
 
 ### Agent Resolution Order
 
@@ -114,17 +114,28 @@ This means zero-config setup: just set `LETTA_API_KEY` and the plugin handles th
 
 ### Model Configuration
 
-The bundled Subconscious agent uses z.ai's free GLM-4.7 model by default, which works automatically with the Letta Cloud API. For **self-hosted Letta** or to use a different model, set `LETTA_MODEL`:
+The plugin **automatically detects available models** on your Letta server and configures the agent appropriately:
+
+1. **Queries available models** from your Letta server (`GET /v1/models/`)
+2. **Checks if the agent's model is available** on that server
+3. **Auto-selects a fallback** if the current model isn't available
+
+#### Auto-Selection Priority
+
+When the agent's model isn't available, the plugin selects from available models in this order:
+1. `openai/gpt-4o-mini` (recommended - fast and cost-effective)
+2. `openai/gpt-4o`
+3. `anthropic/claude-3-5-sonnet`
+4. `anthropic/claude-3-haiku`
+5. `google_ai/gemini-2.0-flash`
+6. First available model on the server
+
+#### Manual Override
+
+To specify a particular model, set `LETTA_MODEL`:
 
 ```bash
-# For OpenAI
 export LETTA_MODEL="openai/gpt-4o-mini"
-
-# For Anthropic
-export LETTA_MODEL="anthropic/claude-3-5-sonnet"
-
-# For other providers
-export LETTA_MODEL="provider/model-name"
 ```
 
 The model handle format is `provider/model`. Common options:
@@ -133,11 +144,10 @@ The model handle format is `provider/model`. Common options:
 |----------|----------------|
 | `openai` | `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo` |
 | `anthropic` | `claude-3-5-sonnet`, `claude-3-opus`, `claude-3-haiku` |
-| `zai` | `glm-4.7` (default) |
+| `google_ai` | `gemini-2.0-flash`, `gemini-1.5-pro` |
+| `zai` | `glm-4.7` (Letta Cloud default) |
 
-When `LETTA_MODEL` is set:
-- **New agents**: Model is applied after auto-import
-- **Existing agents**: Model is updated on next session start if different from saved config
+If `LETTA_MODEL` is set but not available on the server, the plugin will warn you and fall back to auto-selection.
 
 **Note:** Ensure your Letta server has the appropriate API key configured for your chosen provider (e.g., `OPENAI_API_KEY` for OpenAI models).
 
