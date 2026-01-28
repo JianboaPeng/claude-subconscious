@@ -59,6 +59,45 @@ interface AgentDetails {
 }
 
 /**
+ * Regex for validating Letta agent ID format
+ * Format: agent-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (UUID v4 with 'agent-' prefix)
+ */
+const AGENT_ID_REGEX = /^agent-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Validate agent ID format
+ * 
+ * @param agentId - The agent ID to validate
+ * @returns true if valid, false otherwise
+ */
+export function isValidAgentId(agentId: string): boolean {
+  return AGENT_ID_REGEX.test(agentId);
+}
+
+/**
+ * Get a helpful error message for invalid agent ID format
+ */
+function getInvalidAgentIdMessage(agentId: string): string {
+  const lines = [
+    `Invalid LETTA_AGENT_ID format: "${agentId}"`,
+    '',
+    'The agent ID must be a UUID with the "agent-" prefix.',
+    'Expected format: agent-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+    'Example: agent-a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    '',
+    'Common mistakes:',
+    '  - Using the agent\'s friendly name (e.g., "Memo") instead of the UUID',
+    '  - Missing the "agent-" prefix',
+    '',
+    'To find your agent ID:',
+    '  1. Go to https://app.letta.com',
+    '  2. Select your agent',
+    '  3. Copy the ID from the URL or agent settings',
+  ];
+  return lines.join('\n');
+}
+
+/**
  * Read saved config
  */
 function readConfig(): Config {
@@ -374,32 +413,33 @@ export async function getAgentId(apiKey: string, log: (msg: string) => void = co
   // 1. Check environment variable
   const envAgentId = process.env.LETTA_AGENT_ID;
   if (envAgentId) {
+    // Validate format before using
+    if (!isValidAgentId(envAgentId)) {
+      const errorMsg = getInvalidAgentIdMessage(envAgentId);
+      log(`WARNING: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
     log(`Using agent ID from LETTA_AGENT_ID: ${envAgentId}`);
     agentId = envAgentId;
   }
   // 2. Check saved config
   else if (config.agentId) {
-    log(`Using saved agent ID: ${config.agentId}`);
-    agentId = config.agentId;
+    // Validate saved config (in case it was manually edited or corrupted)
+    if (!isValidAgentId(config.agentId)) {
+      log(`WARNING: Saved agent ID has invalid format: ${config.agentId}`);
+      log(`Ignoring invalid saved config and attempting to import default agent...`);
+      // Fall through to import default agent
+      agentId = await importAndSaveAgent(apiKey, log);
+      config = readConfig(); // Reload config after import
+    } else {
+      log(`Using saved agent ID: ${config.agentId}`);
+      agentId = config.agentId;
+    }
   }
   // 3. Import default agent
   else {
-    log('No agent configured - importing default Subconscious agent...');
-    
-    if (!fs.existsSync(DEFAULT_AGENT_FILE)) {
-      throw new Error(`Default agent file not found: ${DEFAULT_AGENT_FILE}`);
-    }
-    
-    agentId = await importDefaultAgent(apiKey);
-    log(`Imported agent: ${agentId}`);
-    
-    // Save for future use
-    config = {
-      agentId,
-      importedAt: new Date().toISOString(),
-    };
-    saveConfig(config);
-    log(`Saved agent ID to ${CONFIG_FILE}`);
+    agentId = await importAndSaveAgent(apiKey, log);
+    config = readConfig(); // Reload config after import
   }
   
   // 4. Ensure model is available (auto-select if not)
@@ -415,6 +455,29 @@ export async function getAgentId(apiKey: string, log: (msg: string) => void = co
   } catch (error) {
     log(`Warning: Could not verify model availability: ${error}`);
   }
+  
+  return agentId;
+}
+
+/**
+ * Import default agent and save to config
+ */
+async function importAndSaveAgent(apiKey: string, log: (msg: string) => void): Promise<string> {
+  log('No agent configured - importing default Subconscious agent...');
+  
+  if (!fs.existsSync(DEFAULT_AGENT_FILE)) {
+    throw new Error(`Default agent file not found: ${DEFAULT_AGENT_FILE}`);
+  }
+  
+  const agentId = await importDefaultAgent(apiKey);
+  log(`Imported agent: ${agentId}`);
+  
+  // Save for future use
+  saveConfig({
+    agentId,
+    importedAt: new Date().toISOString(),
+  });
+  log(`Saved agent ID to ${CONFIG_FILE}`);
   
   return agentId;
 }
