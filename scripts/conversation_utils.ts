@@ -53,9 +53,11 @@ const noopLog: LogFn = () => {};
 
 /**
  * Get durable state directory path
+ * If LETTA_HOME is set, use that as the base instead of cwd
  */
 export function getDurableStateDir(cwd: string): string {
-  return path.join(cwd, '.letta', 'claude');
+  const base = process.env.LETTA_HOME || cwd;
+  return path.join(base, '.letta', 'claude');
 }
 
 /**
@@ -439,8 +441,9 @@ ${LETTA_SECTION_END}`;
  * Update CLAUDE.md with the new Letta memory section
  */
 export function updateClaudeMd(projectDir: string, lettaContent: string): void {
-  const claudeMdPath = process.env.LETTA_CLAUDE_MD_PATH
-    || path.join(projectDir, CLAUDE_MD_PATH);
+  // LETTA_PROJECT sets the base directory; CLAUDE.md goes in {base}/.claude/CLAUDE.md
+  const base = process.env.LETTA_PROJECT || projectDir;
+  const claudeMdPath = path.join(base, CLAUDE_MD_PATH);
 
   let existingContent = '';
 

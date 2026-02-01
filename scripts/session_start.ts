@@ -60,8 +60,10 @@ interface Conversation {
 }
 
 // Durable storage in .letta directory
+// If LETTA_HOME is set, use that as the base instead of cwd
 function getDurableStateDir(cwd: string): string {
-  return path.join(cwd, '.letta', 'claude');
+  const base = process.env.LETTA_HOME || cwd;
+  return path.join(base, '.letta', 'claude');
 }
 
 function getConversationsFile(cwd: string): string {
