@@ -126,6 +126,27 @@ export LETTA_PROJECT="$HOME"   # Consolidate CLAUDE.md to ~/.claude/CLAUDE.md
 
 This means zero-config setup: just set `LETTA_API_KEY` and the plugin handles the rest.
 
+### Multi-Project Usage
+
+**One agent, many projects.** The Subconscious agent is stored globally at `~/.letta/claude-subconscious/config.json`. When you use the plugin in different repos, they all share the same agent brain.
+
+```
+~/.letta/claude-subconscious/config.json  →  ONE agent ID (shared brain)
+                                               ↓
+project-a/.letta/claude/                  →  Project A's conversation threads
+project-b/.letta/claude/                  →  Project B's conversation threads
+project-c/.letta/claude/                  →  Project C's conversation threads
+```
+
+The `.letta/claude/` directories in each project are **conversation bookkeeping** (mapping Claude Code sessions to Letta conversations), not separate agents. Memory blocks are shared across all projects.
+
+To use a **different agent per project**, set `LETTA_AGENT_ID` in your shell or via [direnv](https://direnv.net/):
+
+```bash
+# .envrc in project directory
+export LETTA_AGENT_ID="agent-xxx-for-this-project"
+```
+
 ### Model Configuration
 
 The plugin **automatically detects available models** on your Letta server and configures the agent appropriately:
@@ -256,9 +277,9 @@ The plugin stores state in two locations:
 
 ### Durable State (`.letta/claude/`)
 
-Persisted in your project directory:
-- `conversations.json` - Maps session IDs to Letta conversation IDs
-- `session-{id}.json` - Per-session state (conversation ID, last processed index)
+Persisted in your project directory (this is **conversation bookkeeping**, not a separate agent - see [Multi-Project Usage](#multi-project-usage)):
+- `conversations.json` - Maps Claude Code session IDs → Letta conversation IDs
+- `session-{id}.json` - Per-session state (last processed index, cached conversation ID)
 
 ### Temporary State (`/tmp/letta-claude-sync/`)
 
