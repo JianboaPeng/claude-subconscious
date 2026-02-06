@@ -374,19 +374,21 @@ async function main(): Promise<void> {
     // (UserPromptSubmit hooks add stdout to context)
     const outputs: string[] = [];
     
-    // First prompt: inject all blocks + context. Subsequent: diffs only.
-    const isFirstPrompt = !lastBlockValues;
-    
-    if (isFirstPrompt) {
-      outputs.push(formatAllBlocksForStdout(agent, conversationId));
-    } else {
-      const changedBlocksOutput = formatChangedBlocksForStdout(changedBlocks, lastBlockValues);
-      if (changedBlocksOutput) {
-        outputs.push(changedBlocksOutput);
+    if (mode === 'full') {
+      // Full mode: inject memory blocks + messages
+      const isFirstPrompt = !lastBlockValues;
+      
+      if (isFirstPrompt) {
+        outputs.push(formatAllBlocksForStdout(agent, conversationId));
+      } else {
+        const changedBlocksOutput = formatChangedBlocksForStdout(changedBlocks, lastBlockValues);
+        if (changedBlocksOutput) {
+          outputs.push(changedBlocksOutput);
+        }
       }
     }
     
-    // Add all new messages from Sub
+    // Both modes: inject messages from Sub
     const messageOutput = formatMessagesForStdout(agent, newMessages);
     outputs.push(messageOutput);
     

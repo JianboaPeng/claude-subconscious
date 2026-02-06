@@ -105,7 +105,7 @@ Get your API key from [app.letta.com](https://app.letta.com).
 ### Optional
 
 ```bash
-export LETTA_MODE="whisper"    # Default. Set to "off" to disable
+export LETTA_MODE="whisper"    # Default. Or "full" for blocks + messages, "off" to disable
 export LETTA_AGENT_ID="agent-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 export LETTA_BASE_URL="http://localhost:8283"  # For self-hosted Letta
 export LETTA_MODEL="anthropic/claude-sonnet-4-5"  # Model override
@@ -113,21 +113,22 @@ export LETTA_HOME="$HOME"      # Consolidate .letta state to ~/.letta/
 export LETTA_PROJECT="$HOME"   # Consolidate CLAUDE.md to ~/.claude/CLAUDE.md
 ```
 
-- `LETTA_MODE` - Set to `off` to disable all hooks. Defaults to `whisper` (stdout injection). See [Modes](#modes) below.
+- `LETTA_MODE` - Controls what gets injected. `whisper` (default, messages only), `full` (blocks + messages), `off` (disable). See [Modes](#modes).
 - `LETTA_AGENT_ID` - If not set, the plugin automatically imports a default "Subconscious" agent on first use.
 - `LETTA_BASE_URL` - For self-hosted Letta servers. Defaults to `https://api.letta.com`.
 - `LETTA_MODEL` - Override the agent's model. Optional - the plugin auto-detects and selects from available models. See [Model Configuration](#model-configuration) below.
 - `LETTA_HOME` - Base directory for plugin state files. Creates `{LETTA_HOME}/.letta/claude/` for session data and conversation mappings. Defaults to current working directory. Set to `$HOME` to consolidate all state in one location.
 ### Modes
 
-The `LETTA_MODE` environment variable controls the plugin:
+The `LETTA_MODE` environment variable controls what gets injected into Claude's context:
 
-| Mode | Behavior |
-|------|----------|
-| **`whisper`** (default) | Full blocks on first prompt, diffs + messages after. Never writes to CLAUDE.md. |
-| **`off`** | Disable all hooks. Agent still exists but won't observe or inject anything. |
+| Mode | What Claude sees | Use case |
+|------|-----------------|----------|
+| **`whisper`** (default) | Only messages from Sub | Lightweight — Sub speaks when it has something to say |
+| **`full`** | Memory blocks + messages | Full context — blocks on first prompt, diffs after |
+| **`off`** | Nothing | Disable hooks temporarily |
 
-Subconscious **never writes to CLAUDE.md**. All memory is injected via stdout into the prompt context. If you have an existing CLAUDE.md with `<letta>` content from an older version, it will be cleaned up automatically.
+Subconscious **never writes to CLAUDE.md** in any mode. All content is injected via stdout into the prompt context. If you have an existing CLAUDE.md with `<letta>` content from an older version, it will be cleaned up automatically.
 
 ### Agent Resolution Order
 

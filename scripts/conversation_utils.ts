@@ -26,16 +26,19 @@ const LETTA_MEMORY_END = '</letta_memory_blocks>';
 // Mode Configuration
 // ============================================
 
-export type LettaMode = 'whisper' | 'off';
+export type LettaMode = 'whisper' | 'full' | 'off';
 
 /**
  * Get the current operating mode from LETTA_MODE env var.
- * - whisper (default): All content via stdout injection, no CLAUDE.md writes
+ * - whisper (default): Only inject Sub's messages via stdout
+ * - full: Inject full memory blocks + messages via stdout
  * - off: Disable all hooks
+ *
+ * No mode writes to CLAUDE.md.
  */
 export function getMode(): LettaMode {
   const mode = process.env.LETTA_MODE?.toLowerCase();
-  if (mode === 'off') return 'off';
+  if (mode === 'full' || mode === 'off') return mode;
   return 'whisper';
 }
 
