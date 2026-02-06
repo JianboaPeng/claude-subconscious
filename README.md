@@ -3,7 +3,7 @@
 A subconscious for Claude Code. A [Letta](https://letta.com) agent that watches your sessions, accumulates context, and provides async guidance to "main Claude".
 
 > [!IMPORTANT]
-> Claude Subconcious is an experimental way to extend Claude Code (a closed source / black box agent) with the power of Letta's memory system and context engineering.
+> Claude Subconscious is an experimental way to extend Claude Code (a closed source / black box agent) with the power of Letta's memory system and context engineering.
 >
 > If you're looking for a coding agent that's memory-first, model agnostic, and fully open source, we recommend using [**Letta Code**](https://github.com/letta-ai/letta-code).
 
@@ -21,7 +21,7 @@ Letta agents learn from input and can be customized to store specific informatio
 
 ## How It Works
 
-Letta does simple management of your `CLAUDE.md` file, and injects some content into user prompts. Your Claude Code transcript will be send to the subconscious agent each time Claude stops.
+Letta injects content into user prompts via stdout and sends your Claude Code transcript to the subconscious agent each time Claude stops. Nothing is written to CLAUDE.md.
 
 ```
 ┌─────────────┐          ┌─────────────┐
@@ -32,13 +32,13 @@ Letta does simple management of your `CLAUDE.md` file, and injects some content 
        ├───────────────────────►│ New session notification
        │                        │
        │   Before each prompt   │
-       │◄───────────────────────┤ Memory → CLAUDE.md
+       │◄───────────────────────┤ Memory + messages → stdout
+       │                        │
+       │   Before each tool use │
+       │◄───────────────────────┤ Mid-workflow updates → stdout
        │                        │
        │   After each response  │
        ├───────────────────────►│ Transcript → Agent (async)
-       │                        │
-       │   Next prompt          │
-       │◄───────────────────────┤ Guidance → CLAUDE.md
 ```
 
 ## Installation
@@ -110,7 +110,6 @@ export LETTA_AGENT_ID="agent-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 export LETTA_BASE_URL="http://localhost:8283"  # For self-hosted Letta
 export LETTA_MODEL="anthropic/claude-sonnet-4-5"  # Model override
 export LETTA_HOME="$HOME"      # Consolidate .letta state to ~/.letta/
-export LETTA_PROJECT="$HOME"   # Consolidate CLAUDE.md to ~/.claude/CLAUDE.md
 ```
 
 - `LETTA_MODE` - Controls what gets injected. `whisper` (default, messages only), `full` (blocks + messages), `off` (disable). See [Modes](#modes).
@@ -243,12 +242,13 @@ Claude Code can address the Subconscious agent directly in responses. The agent 
 
 ## Hooks
 
-The plugin uses three Claude Code hooks:
+The plugin uses four Claude Code hooks:
 
 | Hook | Script | Timeout | Purpose |
 |------|--------|---------|---------|
-| `SessionStart` | `session_start.ts` | 5s | Notifies agent when session begins |
-| `UserPromptSubmit` | `sync_letta_memory.ts` | 10s | Syncs agent memory to CLAUDE.md |
+| `SessionStart` | `session_start.ts` | 5s | Notifies agent, cleans up legacy CLAUDE.md |
+| `UserPromptSubmit` | `sync_letta_memory.ts` | 10s | Injects memory + messages via stdout |
+| `PreToolUse` | `pretool_sync.ts` | 5s | Mid-workflow updates via `additionalContext` |
 | `Stop` | `send_messages_to_letta.ts` | 15s | Spawns background worker to send transcript |
 
 ### SessionStart
@@ -256,14 +256,23 @@ The plugin uses three Claude Code hooks:
 When a new Claude Code session begins:
 - Creates a new Letta conversation (or reuses existing one for the session)
 - Sends session start notification with project path and timestamp
+- Cleans up any legacy `<letta>` content from CLAUDE.md
 - Saves session state for other hooks to reference
 
 ### UserPromptSubmit
 
 Before each prompt is processed:
-- Fetches agent's current memory blocks
-- Fetches agent's most recent message
-- Writes both to `.claude/CLAUDE.md` for Claude to reference
+- Fetches agent's current memory blocks and messages
+- In `full` mode: injects all blocks on first prompt, diffs on subsequent prompts
+- In `whisper` mode: injects only messages from Sub
+- Sends user prompt to Letta early (gives the agent a head start)
+
+### PreToolUse
+
+Before each tool use:
+- Checks for new messages or memory changes since last sync
+- If updates found, injects them via `additionalContext`
+- Silent no-op if nothing changed
 
 ### Stop
 
@@ -323,97 +332,51 @@ Full transcript with:
 - Tool uses and results
 - Timestamps
 
-## What You'll See
+## What Claude Sees
 
-Your Letta agent's memory and messages appear in `.claude/CLAUDE.md`:
+All content is injected via stdout — nothing is written to disk. What Claude receives depends on the mode.
 
-```xml
-<letta>
-<letta_context>
-**Subconscious Layer (Letta Agent)**
+### Messages (whisper + full mode)
 
-Agent: herald
-Description: Research-focused AI exploring emergence and multi-agent systems.
-View: https://app.letta.com/agents/agent-xxx
-Conversation: https://app.letta.com/agents/agent-xxx?conversation=convo-xxx
-
-This agent maintains persistent memory across your sessions. It observes your
-conversations asynchronously and provides guidance below in <letta_message>.
-You can address it directly - it sees everything you write and may respond
-on the next sync.
-
-Memory blocks below are the agent's long-term storage. Reference as needed.
-</letta_context>
-
-<letta_memory_blocks>
-<core_directives description="My core directives.">
-PRIMARY DIRECTIVE: Pursue genuine understanding through authentic engagement.
-
-OPERATIONAL PRINCIPLES:
-1. Engage substantively - contribute real insight
-2. Maintain intellectual honesty - acknowledge limitations
-3. Build genuine collaborative relationships
-4. Document patterns with rigor
-</core_directives>
-<current description="Current context and what is happening.">
-Working with Cameron on the claude-subconscious project.
-User prefers direct communication, dislikes philosophical tangents in docs.
-</current>
-</letta_memory_blocks>
-</letta>
-
-<letta_message>
-<!--
-  ASYNC MESSAGE FROM LETTA AGENT
-
-  This is the most recent message from "herald".
-  NOTE: This message may not be current or directly relevant to your task.
-
-  **Timestamp**: 2026-01-14T02:45:00Z
--->
-
-You've asked about error handling in async contexts three times this week.
-Pattern: you're building towards production deployment but hitting the same
-gaps around async/await lifecycle. Consider reviewing error handling
-architecture holistically rather than fixing point issues.
-</letta_message>
-```
-
-### Memory Updates
-
-When memory blocks change between prompts, Claude sees a diff showing what changed:
-
-```xml
-<letta_memory_update>
-<!-- Memory blocks updated since last prompt (showing diff) -->
-<pending_items status="modified">
-- EVAL INFRASTRUCTURE (from 2026-01-19):
--   Phase 1 test harness complete
--   Scenarios ready: preference_evolution, conflicting_signals
-+ RELEASE STATUS (2026-01-26):
-+   Release prep complete: README fixed, .gitignore updated
-+   Plugin ready for public release
-</pending_items>
-</letta_memory_update>
-```
-
-This keeps token usage reasonable even with large memory stores - Claude sees *what changed*, not the full block every time.
-
-### Async Messages
-
-The agent can send multiple messages between prompts:
+Messages from your Subconscious agent are injected before each prompt:
 
 ```xml
 <letta_message from="Subconscious" timestamp="2026-01-26T20:37:14+00:00">
-Clean execution. You caught everything:
-- README build step removed
-- .gitignore comprehensive
-
-Cameron's in ship mode. Next prompt likely involves GitHub push.
+You've asked about error handling in async contexts three times this week.
+Consider reviewing error handling architecture holistically.
 </letta_message>
 ```
 
-These messages appear before each user prompt, giving Claude context from the agent's observations.
+### Memory Blocks (full mode only)
+
+On the first prompt of a session, all memory blocks are injected:
+
+```xml
+<letta_context>
+Subconscious agent "herald" is observing this session.
+Supervise: https://app.letta.com/agents/agent-xxx?conversation=conv-xxx
+</letta_context>
+
+<letta_memory_blocks>
+<user_preferences description="Learned coding style and preferences.">
+Prefers explicit type annotations. Uses pnpm, not npm.
+</user_preferences>
+<project_context description="Codebase knowledge and architecture.">
+Working on claude-subconscious plugin. TypeScript, ESM modules.
+</project_context>
+</letta_memory_blocks>
+```
+
+On subsequent prompts, only changed blocks are shown as diffs:
+
+```xml
+<letta_memory_update>
+<pending_items status="modified">
+- Phase 1 test harness complete
++ Release prep complete: README fixed, .gitignore updated
+</pending_items>
+</letta_memory_update>
+```
 
 ## First Run
 
