@@ -194,7 +194,7 @@ The model handle format is `provider/model`. Common options:
 | `openai` | `gpt-5.2`, `gpt-5-nano`, `gpt-4.1-mini` |
 | `anthropic` | `claude-sonnet-4-5`, `claude-opus-4-5`, `claude-haiku-4-5` |
 | `google_ai` | `gemini-3-flash`, `gemini-2.5-flash`, `gemini-2.5-pro` |
-| `zai` | `glm-4.7` (Letta Cloud default) |
+| `zai` | `glm-5` (Letta Cloud default) |
 
 If `LETTA_MODEL` is set but not available on the server, the plugin will warn you and fall back to auto-selection.
 
