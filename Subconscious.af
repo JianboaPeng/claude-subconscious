@@ -122,7 +122,7 @@
           "batch_item_id": null,
           "group_id": null,
           "id": "message-0",
-          "model": "glm-4.7",
+          "model": "glm-5",
           "agent_id": "agent-0",
           "tool_calls": null,
           "tool_call_id": null,
