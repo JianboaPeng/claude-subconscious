@@ -19,6 +19,7 @@ const LOG_FILE = path.join(TEMP_STATE_DIR, 'send_worker_sdk.log');
 
 interface SdkPayload {
   agentId: string;
+  conversationId: string;
   sessionId: string;
   message: string;
   stateFile: string;
@@ -60,11 +61,13 @@ async function sendViaSdk(payload: SdkPayload): Promise<boolean> {
   }
   // 'full' mode: no allowedTools restriction (all tools available)
 
-  log(`Creating SDK session for agent ${payload.agentId} (mode: ${payload.sdkToolsMode})`);
+  log(`Creating SDK session for conversation ${payload.conversationId} (mode: ${payload.sdkToolsMode})`);
+  log(`  agent: ${payload.agentId}`);
   log(`  cwd: ${payload.cwd}`);
   log(`  allowedTools: ${payload.sdkToolsMode === 'read-only' ? readOnlyTools.join(', ') : 'all'}`);
 
-  const session = resumeSession(payload.agentId, sessionOptions);
+  // Resume the specific conversation so messages appear in the same thread on app.letta.com
+  const session = resumeSession(payload.conversationId, sessionOptions);
 
   try {
     log(`Sending message (${payload.message.length} chars)...`);

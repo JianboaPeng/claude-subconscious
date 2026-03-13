@@ -334,6 +334,7 @@ Write your response as if speaking directly to Claude Code.
       // SDK mode: send via Letta Code SDK (Sub gets client-side tools)
       const sdkPayload = {
         agentId,
+        conversationId,
         sessionId: hookInput.session_id,
         message: userMessage,
         stateFile,
