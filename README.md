@@ -1,6 +1,6 @@
 # Claude Subconscious
 
-A background agent for Claude Code. A [Letta](https://letta.com) agent that runs alongside your sessions — reading your files, researching context, accumulating memory, and providing async guidance back to Claude.
+A background agent that whispers to Claude Code. A [Letta](https://letta.com) agent that watches your sessions, reads your files, builds up memory over time, and whispers guidance back.
 
 > [!IMPORTANT]
 > Claude Subconscious is an experimental way to extend Claude Code (a closed source / black box agent) with the power of Letta's memory system, tool access, and context engineering.
@@ -11,21 +11,21 @@ A background agent for Claude Code. A [Letta](https://letta.com) agent that runs
 
 ## What Is This?
 
-Claude Code is stateless — it forgets everything between sessions. Claude Subconscious adds a persistent, tool-capable background agent underneath:
+Claude Code forgets everything between sessions. Claude Subconscious is a second agent running underneath — watching, learning, and whispering back:
 
-- **Observes** every Claude Code session transcript
-- **Reads your codebase** — can use Read, Grep, and Glob to explore files while processing transcripts
-- **Remembers everything** — persistent memory across sessions, projects, and time
-- **Provides async guidance** — surfaces context, patterns, and reminders before each prompt
-- **Runs in the background** — never blocks Claude Code, processes transcripts asynchronously via the [Letta Code SDK](https://docs.letta.com/letta-code/sdk/)
+- **Watches** every Claude Code session transcript
+- **Reads your codebase** — explores files with Read, Grep, and Glob while processing transcripts
+- **Remembers** across sessions, projects, and time
+- **Whispers guidance** — surfaces context, patterns, and reminders before each prompt
+- **Never blocks** — runs in the background via the [Letta Code SDK](https://docs.letta.com/letta-code/sdk/)
 
-This isn't just a memory layer. It's a second agent with real tool access, running in parallel with Claude Code, building up context over time and feeding it back when it matters.
+Not just a memory layer — a background agent with real tool access that gets smarter the more you use it.
 
 Using Letta's [Conversations](https://docs.letta.com/guides/agents/conversations/) feature, a single agent can serve multiple Claude Code sessions in parallel with shared memory across all of them.
 
 ## How It Works
 
-The plugin hooks into Claude Code's lifecycle. After each response, the transcript is sent to a Letta agent via the Letta Code SDK. The agent processes the transcript with full tool access — it can read files, search the web, and update its own memory. Before the next prompt, any guidance or memory updates are injected into Claude's context via stdout.
+After each response, the transcript is sent to a Letta agent via the Letta Code SDK. The agent reads files, searches the web, updates its memory — then whispers back before the next prompt. Nothing is written to CLAUDE.md.
 
 ```
 ┌─────────────┐          ┌──────────────────────────┐
@@ -40,14 +40,14 @@ The plugin hooks into Claude Code's lifecycle. After each response, the transcri
        ├───────────────────────►│ New session notification
        │                        │
        │   Before each prompt   │
-       │◄───────────────────────┤ Memory + messages → stdout
+       │◄───────────────────────┤ Whispers guidance → stdout
        │                        │
        │   Before each tool use │
        │◄───────────────────────┤ Mid-workflow updates → stdout
        │                        │
        │   After each response  │
        ├───────────────────────►│ Transcript → SDK session (async)
-       │                        │  ↳ Agent reads files, updates memory
+       │                        │  ↳ Reads files, updates memory
 ```
 
 ## Installation
