@@ -568,8 +568,16 @@ export function formatAllBlocksForStdout(agent: Agent, conversationId: string | 
     locationInfo = `Agent ID: ${agent.id}${conversationId ? `, Conversation: ${conversationId}` : ''}`;
   }
 
+  const sdkToolsMode = getSdkToolsMode();
+  const capabilityLine = sdkToolsMode === 'full'
+    ? 'It can read files, search the web, and make changes to your codebase.'
+    : sdkToolsMode === 'read-only'
+    ? 'It can read files, search your codebase, and browse the web (read-only).'
+    : 'It operates in listen-only mode (memory updates only).';
+
   const header = `<letta_context>
-Subconscious agent "${agentName}" is observing this session.
+Subconscious agent "${agentName}" is watching this session and whispering guidance.
+${capabilityLine}
 ${locationInfo}
 </letta_context>`;
 

@@ -31,6 +31,7 @@ import {
   fetchAgent,
   getMode,
   getTempStateDir,
+  getSdkToolsMode,
 } from './conversation_utils.js';
 
 // Configuration
@@ -177,15 +178,25 @@ async function sendSessionStartMessage(
   const projectName = path.basename(cwd);
   const timestamp = new Date().toISOString();
 
+  const sdkToolsMode = getSdkToolsMode();
+  const toolAccessDescription = sdkToolsMode === 'full'
+    ? 'Full tool access enabled — you can Read, Grep, Glob, Edit, Write, Bash, and search the web.'
+    : sdkToolsMode === 'read-only'
+    ? 'Read-only tool access — you can Read, Grep, Glob files and search the web. No writes.'
+    : 'Listen-only mode — no client-side tools. You can only update your memory blocks.';
+
   const message = `<claude_code_session_start>
 <project>${projectName}</project>
 <path>${cwd}</path>
 <session_id>${sessionId}</session_id>
 <timestamp>${timestamp}</timestamp>
+<sdk_tools_mode>${sdkToolsMode}</sdk_tools_mode>
 
 <context>
 A new Claude Code session has begun. I'll be sending you updates as the session progresses.
-You may update your memory blocks with any relevant context for this project.
+
+Tool access: ${toolAccessDescription}
+${sdkToolsMode !== 'off' ? `Use your tools to explore the codebase at ${cwd} when processing transcripts.` : ''}
 </context>
 </claude_code_session_start>`;
 
