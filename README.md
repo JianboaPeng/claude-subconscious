@@ -111,7 +111,7 @@ export LETTA_BASE_URL="http://localhost:8283"  # For self-hosted Letta
 export LETTA_MODEL="anthropic/claude-sonnet-4-5"  # Model override
 export LETTA_CONTEXT_WINDOW="1048576"             # Context window size (e.g. 1M tokens)
 export LETTA_HOME="$HOME"      # Consolidate .letta state to ~/.letta/
-export LETTA_SDK_TOOLS="read-only"       # Or "full"
+export LETTA_SDK_TOOLS="read-only"       # Or "full", "off"
 ```
 
 - `LETTA_MODE` - Controls what gets injected. `whisper` (default, messages only), `full` (blocks + messages), `off` (disable). See [Modes](#modes).
@@ -120,7 +120,7 @@ export LETTA_SDK_TOOLS="read-only"       # Or "full"
 - `LETTA_MODEL` - Override the agent's model. Optional - the plugin auto-detects and selects from available models. See [Model Configuration](#model-configuration) below.
 - `LETTA_CONTEXT_WINDOW` - Override the agent's context window size (in tokens). Useful when `LETTA_MODEL` is set to a model with a large context window that differs from the server default. Example: `1048576` for 1M tokens.
 - `LETTA_HOME` - Base directory for plugin state files. Creates `{LETTA_HOME}/.letta/claude/` for session data and conversation mappings. Defaults to current working directory. Set to `$HOME` to consolidate all state in one location.
-- `LETTA_SDK_TOOLS` - Controls client-side tool access for the Subconscious agent. `read-only` (default) or `full`. See [SDK Tools](#sdk-tools).
+- `LETTA_SDK_TOOLS` - Controls client-side tool access for the Subconscious agent. `read-only` (default), `full`, or `off`. See [SDK Tools](#sdk-tools).
 
 ### Modes
 
@@ -288,6 +288,7 @@ By default, the Subconscious agent now gets **client-side tool access** via the 
 |------|----------------|----------|
 | `read-only` (default) | `Read`, `Grep`, `Glob`, `web_search`, `fetch_webpage` | Safe background research and file reading |
 | `full` | All tools (Bash, Edit, Write, etc.) | Full autonomy — Sub can make changes |
+| `off` | None (memory-only) | Listen-only — Sub processes transcripts but has no client-side tools |
 
 > **Note:** Requires `@letta-ai/letta-code-sdk` (installed as a dependency).
 

@@ -63,7 +63,7 @@ export function getTempStateDir(): string {
 // SDK Tools Configuration
 // ============================================
 
-export type SdkToolsMode = 'read-only' | 'full';
+export type SdkToolsMode = 'read-only' | 'full' | 'off';
 
 /** Read-only tool set: safe defaults for background Sub execution */
 export const SDK_TOOLS_READ_ONLY = ['Read', 'Grep', 'Glob', 'web_search', 'fetch_webpage'];
@@ -75,10 +75,11 @@ export const SDK_TOOLS_BLOCKED = ['AskUserQuestion', 'EnterPlanMode', 'ExitPlanM
  * Get the SDK tools mode from LETTA_SDK_TOOLS env var.
  * - read-only (default): Sub can read files and search the web
  * - full: Sub has full tool access (use with caution)
+ * - off: No client-side tools (listen-only, memory operations only)
  */
 export function getSdkToolsMode(): SdkToolsMode {
   const mode = process.env.LETTA_SDK_TOOLS?.toLowerCase();
-  if (mode === 'full') return mode;
+  if (mode === 'full' || mode === 'off') return mode;
   return 'read-only';
 }
 
