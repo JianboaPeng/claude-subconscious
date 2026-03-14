@@ -239,7 +239,7 @@ The default agent Subconscious maintains 8 memory blocks:
 | `session_patterns` | Recurring behaviors, time-based patterns, common struggles |
 | `pending_items` | Unfinished work, explicit TODOs, follow-up items |
 | `self_improvement` | Guidelines for evolving memory architecture over time |
-| `tool_guidelines` | How to use available tools (memory, search, web) |
+| `tool_guidelines` | How to use available tools (memory, filesystem, web search) |
 
 If you set an alternative agent using `LETTA_AGENT_ID`, your agent will use its existing memory architecture.
 
@@ -409,7 +409,7 @@ On subsequent prompts, only changed blocks are shown as diffs:
 
 ## First Run
 
-On first use, the agent starts with minimal context. It takes a few sessions before the subconscious has enough signal to provide useful guidance. Give it time - it gets smarter as it observes more.
+On first use, the agent starts with minimal context. It takes a few sessions before it has enough signal to provide useful guidance. Give it time — it reads your code, learns your patterns, and gets smarter the more it observes.
 
 ## Use Cases
 
