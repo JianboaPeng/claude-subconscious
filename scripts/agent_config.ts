@@ -152,6 +152,46 @@ function getAgentNameFromFile(): string {
 /**
  * Rename an agent
  */
+/**
+ * Enable memfs (git-backed memory filesystem) on an agent.
+ * Adds the 'git-memory-enabled' tag which triggers the server
+ * to create a git repo and sync blocks as files.
+ */
+async function enableMemfs(apiKey: string, agentId: string): Promise<void> {
+  // First GET the agent to read current tags
+  const getUrl = buildLettaApiUrl(`/agents/${agentId}`);
+  const getResponse = await fetch(getUrl, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+    },
+  });
+
+  let existingTags: string[] = [];
+  if (getResponse.ok) {
+    const agent = await getResponse.json();
+    existingTags = agent.tags || [];
+  }
+
+  // Add git-memory-enabled tag (preserving existing tags)
+  if (existingTags.includes('git-memory-enabled')) return;
+
+  const patchUrl = buildLettaApiUrl(`/agents/${agentId}`);
+  const response = await fetch(patchUrl, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ tags: [...existingTags, 'git-memory-enabled'] }),
+  });
+
+  if (!response.ok) {
+    // Non-fatal - agent still works without memfs
+    console.error(`Warning: Could not enable memfs: ${response.status}`);
+  }
+}
+
 async function renameAgent(apiKey: string, agentId: string, name: string): Promise<void> {
   const url = buildLettaApiUrl(`/agents/${agentId}`);
   
@@ -468,6 +508,9 @@ async function importDefaultAgent(apiKey: string): Promise<string> {
   
   // Rename to original name (removes "_copy" suffix added by import)
   await renameAgent(apiKey, agentId, originalName);
+  
+  // Enable memfs (git-backed memory filesystem) for better memory management
+  await enableMemfs(apiKey, agentId);
   
   return agentId;
 }
