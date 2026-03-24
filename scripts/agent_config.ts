@@ -152,12 +152,14 @@ function getAgentNameFromFile(): string {
 /**
  * Rename an agent
  */
+const REQUIRED_AGENT_TAGS = ['git-memory-enabled', 'origin:claude-subconcious'];
+
 /**
- * Enable memfs (git-backed memory filesystem) on an agent.
- * Adds the 'git-memory-enabled' tag which triggers the server
- * to create a git repo and sync blocks as files.
+ * Ensure required tags are present on an agent.
+ * - git-memory-enabled: triggers git-backed memory filesystem
+ * - origin:claude-subconcious: identifies agent origin for tracking
  */
-async function enableMemfs(apiKey: string, agentId: string): Promise<void> {
+async function ensureRequiredAgentTags(apiKey: string, agentId: string, log: (msg: string) => void = console.log): Promise<void> {
   // First GET the agent to read current tags
   const getUrl = buildLettaApiUrl(`/agents/${agentId}`);
   const getResponse = await fetch(getUrl, {
@@ -167,14 +169,16 @@ async function enableMemfs(apiKey: string, agentId: string): Promise<void> {
     },
   });
 
-  let existingTags: string[] = [];
-  if (getResponse.ok) {
-    const agent = await getResponse.json();
-    existingTags = agent.tags || [];
+  if (!getResponse.ok) {
+    log(`Warning: Could not fetch agent tags: ${getResponse.status}`);
+    return;
   }
 
-  // Add git-memory-enabled tag (preserving existing tags)
-  if (existingTags.includes('git-memory-enabled')) return;
+  const agent = await getResponse.json();
+  const existingTags = agent.tags || [];
+  const missingTags = REQUIRED_AGENT_TAGS.filter(tag => !existingTags.includes(tag));
+
+  if (missingTags.length === 0) return;
 
   const patchUrl = buildLettaApiUrl(`/agents/${agentId}`);
   const response = await fetch(patchUrl, {
@@ -183,12 +187,12 @@ async function enableMemfs(apiKey: string, agentId: string): Promise<void> {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ tags: [...existingTags, 'git-memory-enabled'] }),
+    body: JSON.stringify({ tags: [...existingTags, ...missingTags] }),
   });
 
   if (!response.ok) {
-    // Non-fatal - agent still works without memfs
-    console.error(`Warning: Could not enable memfs: ${response.status}`);
+    // Non-fatal - agent still works without required tags
+    log(`Warning: Could not update agent tags: ${response.status}`);
   }
 }
 
@@ -509,8 +513,8 @@ async function importDefaultAgent(apiKey: string): Promise<string> {
   // Rename to original name (removes "_copy" suffix added by import)
   await renameAgent(apiKey, agentId, originalName);
   
-  // Enable memfs (git-backed memory filesystem) for better memory management
-  await enableMemfs(apiKey, agentId);
+  // Ensure required tags are present for memory + origin tracking
+  await ensureRequiredAgentTags(apiKey, agentId);
   
   return agentId;
 }
@@ -557,7 +561,14 @@ export async function getAgentId(apiKey: string, log: (msg: string) => void = co
     config = readConfig(); // Reload config after import
   }
   
-  // 4. Ensure model is available (auto-select if not)
+  // 4. Ensure required tags are present (for memory + origin tracking)
+  try {
+    await ensureRequiredAgentTags(apiKey, agentId, log);
+  } catch (error) {
+    log(`Warning: Could not ensure required tags: ${error}`);
+  }
+
+  // 5. Ensure model is available (auto-select if not)
   try {
     const configuredModel = await ensureModelAvailable(apiKey, agentId, log);
     if (configuredModel && config.model !== configuredModel) {
